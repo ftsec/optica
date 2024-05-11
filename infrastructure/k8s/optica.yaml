@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: optica
+  namespace: optica
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: optica
+  template:
+    metadata:
+      labels:
+        app: optica
+    spec:
+      serviceAccountName: optica-service
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: optica
+        image: optica159/optica:latest
+        imagePullPolicy: Always
+        command: ["python"]
+        args: ["app.py"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          privileged: false
+          capabilities:
+            drop:
+              - ALL
+        resources:
+          limits:
+            cpu: "1"
+            memory: "500Mi"
+          requests:
+            cpu: "0.5"
+            memory: "200Mi"

@@ -7,15 +7,6 @@ module "sqs" {
       sid     = "SQS"
       actions = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage"]
 
-      principals = [
-        {
-          type        = "Federated"
-          identifiers = [module.eks.oidc_provider_arn]
-          }, {
-          type        = "AWS"
-          identifiers = [module.iam_assumable_role_self_assume.iam_role_arn, module.eks_admins_iam_role.iam_role_arn]
-        }
-      ]
     }
   }
   tags = {
@@ -34,16 +25,6 @@ module "sqs-out" {
     sqs = {
       sid     = "SQS"
       actions = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage","sqs:PurgeQueue"]
-
-      principals = [
-        {
-          type        = "Federated"
-          identifiers = [module.eks.oidc_provider_arn]
-          }, {
-          type        = "AWS"
-          identifiers = [module.iam_assumable_role_self_assume.iam_role_arn, module.eks_admins_iam_role.iam_role_arn]
-        }
-      ]
     }
   }
   tags = {

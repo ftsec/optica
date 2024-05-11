@@ -6,15 +6,17 @@ enabling automated test retrieval of test information based on the predefined co
 for more information see https://developer.cisco.com/docs/thousandeyes/v6/tests-metadata/#test-metadata
 """
 import logging
+import re
 from enum import Enum
 from pprint import pprint
 
-from pydantic import BaseModel, Field, HttpUrl, EmailStr, conint
+from pydantic import BaseModel, Field, HttpUrl, conint, json
 from datetime import datetime
 from typing import Optional, List, Dict
 
 
 class TestType(str, Enum):
+    __test__ = False
     agent_to_server = "agent-to-server"
     agent_to_agent = "agent-to-agent"
     bgp = "bgp"
@@ -27,7 +29,7 @@ class TestType(str, Enum):
     dns_server = "dns-server"
     dns_dnssec = "dns-dnssec"
     sip_server = "sip-server"
-    voice = "voice (RTP Stream)"
+    voice = "voice"
 
 class DNSServer(BaseModel):
     serverName: str
@@ -126,7 +128,12 @@ class AllTestTypes(BaseModel):
     testName: Optional[str] = Field(None, description="Unique name of the test")
     type: Optional[str] = Field(None, description="Type of test, read-only")
 
-
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.redact_sensitive_data()
+    def redact_sensitive_data(self):
+        print('Redacting sensitive data before sending to out')
+        self.createdBy = re.sub(r'\(.*?\)', f'(EMAIL_REDACTED)', self.createdBy)
 class BGPTest(AllTestTypes):
     bgpMonitors: Optional[List[BGPMonitor]] = Field(None, description="List of BGP Monitor objects")
     includeCoveredPrefixes: Optional[int] = Field(None, description="Set to 1 to include subprefix queries")
@@ -385,7 +392,7 @@ class RTPStreamTest(BaseModel):
     targetAgentId: int= Field(None)
 
 
-def get_test_object(data: dict):
+def validate_test_data(data: dict):
     if 'type' not in data:
         logging.error("Test type is required but not provided.")
         raise ValueError("Test type is required but not provided.")
@@ -418,4 +425,4 @@ def get_test_object(data: dict):
         raise ValueError(f"Test class not found for the type: {test_type}")
 
     logging.info(f"Creating test object for type: {test_type}")
-    return test_class(**data)
+    return test_class(**data).json()

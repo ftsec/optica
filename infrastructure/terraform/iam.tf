@@ -142,23 +142,21 @@ module "optica_sqs_policy" {
 }
 
 
-module "iam_assumable_role_self_assume" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-assumable-role-with-oidc"
 
-  create_role            = true
-  allow_self_assume_role = true
+module "iam_assumable_role_with_oidc" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role-with-oidc"
 
-  role_name = "optica-role-with-oidc-self-assume"
+  create_role = true
+  role_name = "role-with-oidc-self-assume"
 
   tags = {
     Role        = "role-with-oidc-self-assume"
     Environment = var.Environment
   }
-
-  provider_url  = module.eks.oidc_provider_arn
-  provider_urls = [module.eks.oidc_provider_arn]
-
-  role_policy_arns = [module.optica_sqs_policy.arn]
-
+  provider_url = module.eks.oidc_provider
+  role_policy_arns = [
+    module.optica_sqs_policy.arn,
+  ]
+  number_of_role_policy_arns = 1
   oidc_fully_qualified_subjects = ["system:serviceaccount:${local.cluster_namespace}:${local.service_account_name}"]
 }

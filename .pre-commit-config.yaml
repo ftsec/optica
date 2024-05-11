@@ -9,20 +9,6 @@ repos:
     -   id: double-quote-string-fixer
     -   id: name-tests-test
     -   id: requirements-txt-fixer
-    -   id: bandit
-        name: bandit
-        description: 'Bandit is a tool for finding common security issues in Python code'
-        entry: bandit
-        language: python
-        language_version: python3
-        types: [python]
-        require_serial: true
-    -   id: trufflehog
-        name: TruffleHog
-        description: Detect secrets in your data with TruffleHog.
-        entry: trufflehog git file://. --since-commit HEAD --only-verified --fail
-        language: python
-        pass_filenames: false
 -   repo: https://github.com/asottile/setup-cfg-fmt
     rev: v2.5.0
     hooks:
@@ -56,3 +42,8 @@ repos:
     -   id: mypy
         additional_dependencies: [types-all]
         exclude: ^testing/resources/
+-   repo: https://github.com/Lucas-C/pre-commit-hooks-bandit
+    rev: v1.0.5
+    hooks:
+    -   id: python-bandit-vulnerability-check
+        args: [--skip, "B101", --recursive, clumper]

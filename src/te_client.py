@@ -1,83 +1,92 @@
 import json
-import logging
-import time
-from pprint import pprint
-
 import requests
+from object.object import validate_test_data
+import boto3
+from botocore.exceptions import ClientError
+BASE_URL = "https://api.thousandeyes.com/v6"
+import log_config
+logger = log_config.logger
+def get_te_secret():
+    secret_name = 'thousandeyesbearertoken'# nosec
+    region_name = "us-west-2" # nosec
 
-import config.settings
-from config.settings import base_url, te_bearer_token, request_timeout
-from object.object import TestType, validate_test_data
-from src.tines import send_to_tines_webhook
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name,
+    )
 
-te_session = requests.Session()
-headers = {"Authorization": f"Bearer {te_bearer_token}",
-           "content-type": "application/json"}
-def send_get_request(path, method='GET', params=None):
     try:
-        if method == 'GET':
-            response = te_session.get(base_url + f'/{path}'
-                                  , headers=headers
-                                  , timeout=request_timeout, params=params)
-            if response.status_code != 200:
-                logging.error(f"Failed to get the data from ThousandEyes API. Status code: {response.status_code}")
-                return None
-            return response
-    except Exception as e:
-        logging.error(f"Failed to get the test data from ThousandEyes API. Error: {e}")
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            logger.info("The requested secret " + secret_name + " was not found")
+        elif e.response['Error']['Code'] == 'InvalidRequestException':
+            logger.info("The request was invalid due to:", e)
+        elif e.response['Error']['Code'] == 'InvalidParameterException':
+            logger.info("The request had invalid params:", e)
+        elif e.response['Error']['Code'] == 'DecryptionFailure':
+            logger.info("The requested secret can't be decrypted using the provided KMS key:", e)
+        elif e.response['Error']['Code'] == 'InternalServiceError':
+            logger.info("An error occurred on service side:", e)
+    else:
+        if 'SecretString' in get_secret_value_response:
+            return  get_secret_value_response['SecretString']
+        return None
+
+# Session setup
+session = requests.Session()
+session.headers.update({
+    "Authorization": f"Bearer {get_te_secret()}",
+    "Content-Type": "application/json"
+})
+def send_request(path, params=None):
+    url = f"{BASE_URL}/{path}"
+    try:
+        response = session.get(url, timeout=30, params=params)
+        response.raise_for_status()
+        return response
+    except requests.RequestException as e:
+        logger.error(f"Request failed for {url}. Error: {e}")
         return None
 
 def get_all_tests():
     try:
-        te_test_response = send_get_request('tests.json')
-        tests = []
-        if te_test_response is not None:
-            for test in te_test_response.json()['test']:
-                tests.append(json.loads(validate_test_data(test)))
-        return json.dumps(tests)
+        response = send_request('tests.json')
+        if response:
+            tests = [json.loads(validate_test_data(test)) for test in response.json()['test']]
+            return json.dumps(tests)
     except Exception as e:
-        logging.error(f"Failed to get the test data from ThousandEyes API. Error: {e}")
-        return None
+        logger.error(f"Failed to process test data. Error: {e}")
+    return None
+
 def get_all_tests_by_aid(aid):
+    logger.info(f"Retrieving tests for account group: {aid}")
     try:
-        params = {'aid': aid}
-        logging.info(f"Getting tests for account group: {aid}")
-        print(f"Getting tests for account group: {aid}")
-        te_test_response = send_get_request('tests.json', params=params)
-        tests = []
-        if te_test_response is not None:
-            for test in te_test_response.json()['test']:
-                tests.append(json.loads(validate_test_data(test)))
-        return json.dumps(tests)
+        response = send_request('tests.json', params={'aid': aid})
+        if response:
+            tests = [json.loads(validate_test_data(test)) for test in response.json()['test']]
+            return json.dumps(tests)
     except Exception as e:
-        logging.error(f"Failed to get the test data from ThousandEyes API. Error: {e}")
-        return None
+        logger.error(f"Failed to retrieve test data for account group {aid}. Error: {e}")
+    return None
 
 def get_account_groups():
     try:
-        te_test_response = send_get_request('account-groups.json')
-        return te_test_response.json()
+        return send_request('account-groups.json').json()
     except Exception as e:
-        logging.error(f"Failed to get the test data from ThousandEyes API. Error: {e}")
+        logger.error(f"Failed to retrieve account group data. Error: {e}")
         return None
+
 def get_all_group_ids():
     try:
-        ida_s=[]
-        for account_group in get_account_groups()['accountGroups']:
-            ida_s.append(account_group['aid'])
-        ida_s.append('primary')
-        return ida_s
+        account_groups = get_account_groups()
+        if account_groups:
+            return [group['aid'] for group in account_groups['accountGroups']] + ['primary']
     except Exception as e:
-        logging.error(f"Failed to get the test data from ThousandEyes API. Error: {e}")
-        return ''
+        logger.error(f"Failed to retrieve account group IDs. Error: {e}")
+    return []
 
-print(get_all_tests())
-# tests_by_accounts = {}
-# for account_group in get_account_groups()['accountGroups']:
-#     tests_by_accounts[account_group['aid']] = get_all_tests_by_aid(account_group['aid'])['test']
-# tests_by_accounts['primary'] = get_all_tests()['test']
-#
-#
-# # Webhook URL
-# url = "https://winter-moon-1900.tines.com/webhook/optica/"
-# print(send_to_tines_webhook(url, config.settings.tines_webhook_secret, tests_by_accounts))
+
