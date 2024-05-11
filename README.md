@@ -82,9 +82,9 @@ kubectl apply -n <namespace> -f optica.yaml
 - Choose one of the following messages to send:
 
 ```json
-{"key": "tines", "body": "primary"}   # Use for primary account group
+{"key": "tines", "body": "primary"}   # Use this to check default account
 ```
 
 ```json
-{"key": "tines", "body": "12345"}     # Substitute with your ThousandEyes account group ID
+{"key": "tines", "body": "12345"}     # Substitute with your ThousandEyes account group ID or other
 ```
