@@ -1,4 +1,4 @@
-# ThousandEyes Optica Integration with Terraform, AWS, and Kubernetes
+# Optica
 
 ![img.png](img.png)
 ## Prerequisites
